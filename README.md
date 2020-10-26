@@ -4,6 +4,10 @@
 [![Django](https://img.shields.io/badge/django-2.2-brightgreen.svg?style=plastic)](https://www.djangoproject.com/)
 [![Docker Pulls](https://img.shields.io/docker/pulls/jumpserver/jms_all.svg)](https://hub.docker.com/u/jumpserver)
 
+|Developer Wanted|
+|------------------|
+|JumpServer 正在寻找开发者，一起为改变世界做些贡献吧，哪怕一点点，联系我 <ibuler@fit2cloud.com> |
+
 JumpServer 是全球首款开源的堡垒机，使用 GNU GPL v2.0 开源协议，是符合 4A 规范的运维安全审计系统。
 
 JumpServer 使用 Python / Django 为主进行开发，遵循 Web 2.0 规范，配备了业界领先的 Web Terminal 方案，交互界面美观、用户体验好。
@@ -201,6 +205,16 @@ v2.1.0 是 v2.0.0 之后的功能版本。
 - [极速安装](https://docs.jumpserver.org/zh/master/install/setup_by_fast/)
 - [完整文档](https://docs.jumpserver.org)
 - [演示视频](https://jumpserver.oss-cn-hangzhou.aliyuncs.com/jms-media/%E3%80%90%E6%BC%94%E7%A4%BA%E8%A7%86%E9%A2%91%E3%80%91Jumpserver%20%E5%A0%A1%E5%9E%92%E6%9C%BA%20V1.5.0%20%E6%BC%94%E7%A4%BA%E8%A7%86%E9%A2%91%20-%20final.mp4)
+
+## 组件项目
+- [Lina](https://github.com/jumpserver/lina) JumpServer Web UI 项目
+- [Luna](https://github.com/jumpserver/luna) JumpServer Web Terminal 项目
+- [Koko](https://github.com/jumpserver/koko) JumpServer 字符协议 Connector 项目，替代原来 Python 版本的 [Coco](https://github.com/jumpserver/coco)
+- [Guacamole](https://github.com/jumpserver/docker-guacamole) JumpServer 图形协议 Connector 项目，依赖 [Apache Guacamole](https://guacamole.apache.org/)
+
+## JumpServer 企业版 
+- [申请企业版试用](https://jinshuju.net/f/kyOYpi)
+> 注：企业版支持离线安装，申请通过后会提供高速下载链接。
 
 ## 案例研究
 

@@ -149,6 +149,7 @@ class SystemUserListSerializer(SystemUserSerializer):
     class Meta(SystemUserSerializer.Meta):
         fields = [
             'id', 'name', 'username', 'protocol',
+            'password', 'public_key', 'private_key',
             'login_mode', 'login_mode_display',
             'priority', "username_same_with_user",
             'auto_push', 'sudo', 'shell', 'comment',
@@ -156,6 +157,12 @@ class SystemUserListSerializer(SystemUserSerializer):
             'auto_generate_key',
             'sftp_root',
         ]
+
+        extra_kwargs = {
+            'password': {"write_only": True},
+            'public_key': {"write_only": True},
+            'private_key': {"write_only": True},
+        }
 
     @classmethod
     def setup_eager_loading(cls, queryset):
@@ -222,15 +229,8 @@ class SystemUserNodeRelationSerializer(RelationMixin, serializers.ModelSerialize
             'id', 'node', "node_display",
         ]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.tree = Node.tree()
-
     def get_node_display(self, obj):
-        if hasattr(obj, 'node_key'):
-            return self.tree.get_node_full_tag(obj.node_key)
-        else:
-            return obj.node.full_value
+        return obj.node.full_value
 
 
 class SystemUserUserRelationSerializer(RelationMixin, serializers.ModelSerializer):

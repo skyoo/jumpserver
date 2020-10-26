@@ -18,6 +18,7 @@ from importlib import import_module
 from django.urls import reverse_lazy
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from urllib.parse import urljoin, urlparse
+from django.utils.translation import ugettext_lazy as _
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_DIR = os.path.dirname(BASE_DIR)
@@ -163,7 +164,7 @@ class Config(dict):
         'AUTH_LDAP_SEARCH_FILTER': '(cn=%(user)s)',
         'AUTH_LDAP_START_TLS': False,
         'AUTH_LDAP_USER_ATTR_MAP': {"username": "cn", "name": "sn", "email": "mail"},
-        'AUTH_LDAP_CONNECT_TIMEOUT': 30,
+        'AUTH_LDAP_CONNECT_TIMEOUT': 10,
         'AUTH_LDAP_SEARCH_PAGED_SIZE': 1000,
         'AUTH_LDAP_SYNC_IS_PERIODIC': False,
         'AUTH_LDAP_SYNC_INTERVAL': None,
@@ -247,7 +248,7 @@ class Config(dict):
         'HTTP_BIND_HOST': '0.0.0.0',
         'HTTP_LISTEN_PORT': 8080,
         'WS_LISTEN_PORT': 8070,
-        'LOGIN_LOG_KEEP_DAYS': 90,
+        'LOGIN_LOG_KEEP_DAYS': 9999,
         'TASK_LOG_KEEP_DAYS': 10,
         'ASSETS_PERM_CACHE_TIME': 3600 * 24,
         'SECURITY_MFA_VERIFY_TTL': 3600,
@@ -256,6 +257,7 @@ class Config(dict):
         'SYSLOG_FACILITY': 'user',
         'SYSLOG_SOCKTYPE': 2,
         'PERM_SINGLE_ASSET_TO_UNGROUP_NODE': False,
+        'PERM_EXPIRED_CHECK_PERIODIC': 60 * 60,
         'WINDOWS_SSH_DEFAULT_SHELL': 'cmd',
         'FLOWER_URL': "127.0.0.1:5555",
         'DEFAULT_ORG_SHOW_ALL_USERS': True,
@@ -266,7 +268,13 @@ class Config(dict):
         'ORG_CHANGE_TO_URL': '',
         'LANGUAGE_CODE': 'zh',
         'TIME_ZONE': 'Asia/Shanghai',
-        'CHANGE_AUTH_PLAN_SECURE_MODE_ENABLED': True
+        'CHANGE_AUTH_PLAN_SECURE_MODE_ENABLED': True,
+        'USER_LOGIN_SINGLE_MACHINE_ENABLED': False,
+        'TICKETS_ENABLED': True,
+        'SESSION_COOKIE_SECURE': False,
+        'CSRF_COOKIE_SECURE': False,
+        'REFERER_CHECK_ENABLED': False,
+        'SERVER_REPLAY_STORAGE': {}
     }
 
     def compatible_auth_openid_of_key(self):
@@ -447,6 +455,9 @@ class DynamicConfig:
             backends.insert(0, 'authentication.backends.api.SSOAuthentication')
         return backends
 
+    def AUTH_DB(self):
+        return len(self.AUTHENTICATION_BACKENDS()) == 2
+
     def XPACK_LICENSE_IS_VALID(self):
         if not HAS_XPACK:
             return False
@@ -455,6 +466,16 @@ class DynamicConfig:
             return License.has_valid_license()
         except:
             return False
+
+    def XPACK_INTERFACE_LOGIN_TITLE(self):
+        default_title = _('Welcome to the JumpServer open source fortress')
+        if not HAS_XPACK:
+            return default_title
+        try:
+            from xpack.plugins.interface.models import Interface
+            return Interface.get_login_title()
+        except:
+            return default_title
 
     def LOGO_URLS(self):
         logo_urls = {'logo_logout': static('img/logo.png'),
