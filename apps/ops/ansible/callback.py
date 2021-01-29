@@ -60,11 +60,17 @@ class CallbackMixin:
         self.results_raw[t][host][task_name] = task_result
         self.clean_result(t, host, task_name, task_result)
 
+    def close(self):
+        if hasattr(self._display, 'close'):
+            self._display.close()
+
 
 class AdHocResultCallback(CallbackMixin, CallbackModule, CMDCallBackModule):
     """
     Task result Callback
     """
+    context = None
+
     def clean_result(self, t, host, task_name, task_result):
         contacted = self.results_summary["contacted"]
         dark = self.results_summary["dark"]
@@ -133,7 +139,11 @@ class AdHocResultCallback(CallbackMixin, CallbackModule, CMDCallBackModule):
         pass
 
     def set_play_context(self, context):
-        context.ssh_args = '-C -o ControlMaster=no'
+        # for k, v in context._attributes.items():
+        #     print("{} ==> {}".format(k, v))
+        if self.context and isinstance(self.context, dict):
+            for k, v in self.context.items():
+                setattr(context, k, v)
 
 
 class CommandResultCallback(AdHocResultCallback):

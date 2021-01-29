@@ -62,7 +62,7 @@ class TerminalSettingSerializer(serializers.Serializer):
     )
     TERMINAL_PASSWORD_AUTH = serializers.BooleanField(required=False)
     TERMINAL_PUBLIC_KEY_AUTH = serializers.BooleanField(required=False)
-    TERMINAL_HEARTBEAT_INTERVAL = serializers.IntegerField(min_value=5, max_value=99999, required=True)
+    TERMINAL_HEARTBEAT_INTERVAL = serializers.IntegerField(min_value=5, max_value=99999, required=False)
     TERMINAL_ASSET_LIST_SORT_BY = serializers.ChoiceField(SORT_BY_CHOICES, required=False)
     TERMINAL_ASSET_LIST_PAGE_SIZE = serializers.ChoiceField(PAGE_SIZE_CHOICES, required=False)
     TERMINAL_SESSION_KEEP_DURATION = serializers.IntegerField(min_value=1, max_value=99999, required=True)
@@ -82,6 +82,8 @@ class SecuritySettingSerializer(serializers.Serializer):
     SECURITY_PASSWORD_LOWER_CASE = serializers.BooleanField(required=False)
     SECURITY_PASSWORD_NUMBER = serializers.BooleanField(required=False)
     SECURITY_PASSWORD_SPECIAL_CHAR = serializers.BooleanField(required=False)
+    SECURITY_INSECURE_COMMAND = serializers.BooleanField(required=False)
+    SECURITY_INSECURE_COMMAND_EMAIL_RECEIVER = serializers.CharField(max_length=8192, required=False, allow_blank=True)
 
 
 class SettingsSerializer(serializers.Serializer):

@@ -7,6 +7,7 @@ from collections import OrderedDict
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.utils.encoding import force_text
+from rest_framework.fields import empty
 
 from rest_framework.metadata import SimpleMetadata
 from rest_framework import exceptions, serializers
@@ -58,6 +59,10 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         field_info['type'] = self.label_lookup[field]
         field_info['required'] = getattr(field, 'required', False)
 
+        default = getattr(field, 'default', False)
+        if default and isinstance(default, (str, int)):
+            field_info['default'] = default
+
         for attr in self.attrs:
             value = getattr(field, attr, None)
             if value is not None and value != '':
@@ -68,9 +73,8 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         elif getattr(field, 'fields', None):
             field_info['children'] = self.get_serializer_info(field)
 
-        if (not field_info.get('read_only') and
-            not isinstance(field, (serializers.RelatedField, serializers.ManyRelatedField)) and
-                hasattr(field, 'choices')):
+        if not isinstance(field, (serializers.RelatedField, serializers.ManyRelatedField)) \
+                and hasattr(field, 'choices'):
             field_info['choices'] = [
                 {
                     'value': choice_value,
@@ -87,6 +91,13 @@ class SimpleMetadataWithFilters(SimpleMetadata):
             fields = view.get_filter_fields(request)
         elif hasattr(view, 'filter_fields'):
             fields = view.filter_fields
+        elif hasattr(view, 'filterset_fields'):
+            fields = view.filterset_fields
+        elif hasattr(view, 'get_filterset_fields'):
+            fields = view.get_filterset_fields(request)
+
+        if isinstance(fields, dict):
+            fields = list(fields.keys())
         return fields
 
     def get_ordering_fields(self, request, view):
@@ -99,12 +110,12 @@ class SimpleMetadataWithFilters(SimpleMetadata):
 
     def determine_metadata(self, request, view):
         metadata = super(SimpleMetadataWithFilters, self).determine_metadata(request, view)
-        filter_fields = self.get_filters_fields(request, view)
+        filterset_fields = self.get_filters_fields(request, view)
         order_fields = self.get_ordering_fields(request, view)
 
         meta_get = metadata.get("actions", {}).get("GET", {})
         for k, v in meta_get.items():
-            if k in filter_fields:
+            if k in filterset_fields:
                 v["filter"] = True
             if k in order_fields:
                 v["order"] = True

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.templatetags.static import static
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
@@ -13,6 +13,7 @@ def jumpserver_processor(request):
         'LOGO_TEXT_URL': static('img/logo_text.png'),
         'LOGIN_IMAGE_URL': static('img/login_image.png'),
         'FAVICON_URL': static('img/facio.ico'),
+        'LOGIN_CAS_LOGO_URL': static('img/login_cas_logo.png'),
         'JMS_TITLE': 'JumpServer',
         'VERSION': settings.VERSION,
         'COPYRIGHT': 'FIT2CLOUD 飞致云' + ' © 2014-2020',

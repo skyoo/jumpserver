@@ -5,14 +5,14 @@ from rest_framework import serializers
 from django.db.models import F
 
 from common.mixins import BulkSerializerMixin
-from common.serializers import AdaptedBulkListSerializer
+from common.drf.serializers import AdaptedBulkListSerializer
 from terminal.models import Session
 from ops.models import CommandExecution
 from . import models
 
 
 class FTPLogSerializer(serializers.ModelSerializer):
-    operate_display = serializers.ReadOnlyField(source='get_operate_display')
+    operate_display = serializers.ReadOnlyField(source='get_operate_display', label=_('Operate for display'))
 
     class Meta:
         model = models.FTPLog
@@ -23,16 +23,20 @@ class FTPLogSerializer(serializers.ModelSerializer):
 
 
 class UserLoginLogSerializer(serializers.ModelSerializer):
-    type_display = serializers.ReadOnlyField(source='get_type_display')
-    status_display = serializers.ReadOnlyField(source='get_status_display')
-    mfa_display = serializers.ReadOnlyField(source='get_mfa_display')
+    type_display = serializers.ReadOnlyField(source='get_type_display', label=_('Type for display'))
+    status_display = serializers.ReadOnlyField(source='get_status_display', label=_('Status for display'))
+    mfa_display = serializers.ReadOnlyField(source='get_mfa_display', label=_('MFA for display'))
 
     class Meta:
         model = models.UserLoginLog
         fields = (
             'id', 'username', 'type', 'type_display', 'ip', 'city', 'user_agent',
-            'mfa', 'reason', 'status', 'status_display', 'datetime', 'mfa_display'
+            'mfa', 'reason', 'status', 'status_display', 'datetime', 'mfa_display',
+            'backend'
         )
+        extra_kwargs = {
+            "user_agent": {'label': _('User agent')}
+        }
 
 
 class OperateLogSerializer(serializers.ModelSerializer):
@@ -75,13 +79,14 @@ class CommandExecutionSerializer(serializers.ModelSerializer):
             'hosts': {'label': _('Hosts')},  # 外键，会生成 sql。不在 model 上修改
             'run_as': {'label': _('Run as')},
             'user': {'label': _('User')},
+            'run_as_display': {'label': _('Run as for display')},
+            'user_display': {'label': _('User for display')},
         }
 
     @classmethod
     def setup_eager_loading(cls, queryset):
         """ Perform necessary eager loading of data. """
-        queryset = queryset.annotate(user_display=F('user__name'))\
-            .annotate(run_as_display=F('run_as__name'))
+        queryset = queryset.prefetch_related('user', 'run_as', 'hosts')
         return queryset
 
 

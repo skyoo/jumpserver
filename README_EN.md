@@ -1,22 +1,135 @@
 ## Jumpserver 
 
-![Total visitor](https://visitor-count-badge.herokuapp.com/total.svg?repo_id=jumpserver)
-![Visitors in today](https://visitor-count-badge.herokuapp.com/today.svg?repo_id=jumpserver)
 [![Python3](https://img.shields.io/badge/python-3.6-green.svg?style=plastic)](https://www.python.org/)
-[![Django](https://img.shields.io/badge/django-2.1-brightgreen.svg?style=plastic)](https://www.djangoproject.com/)
-[![Ansible](https://img.shields.io/badge/ansible-2.4.2.0-blue.svg?style=plastic)](https://www.ansible.com/)
-[![Paramiko](https://img.shields.io/badge/paramiko-2.4.1-green.svg?style=plastic)](http://www.paramiko.org/)
+[![Django](https://img.shields.io/badge/django-2.2-brightgreen.svg?style=plastic)](https://www.djangoproject.com/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/jumpserver/jms_all.svg)](https://hub.docker.com/u/jumpserver)
 
+---- 
+## CRITICAL BUG WARNING
+
+Recently we have found a critical bug for remote execution vulnerability which leads to pre-auth and info leak, please fix it as soon as possible.
+
+Thanks for **reactivity from Alibaba Hackerone bug bounty program** report us this bug
+
+**Vulnerable version:**
+```
+< v2.6.2
+< v2.5.4
+< v2.4.5 
+= v1.5.9
+>= v1.5.3
+```
+
+**Safe and Stable version:**
+```
+>= v2.6.2
+>= v2.5.4
+>= v2.4.5 
+= v1.5.9 （version tag didn't change）
+< v1.5.3
+```
+
+**Bug Fix Solution:**
+Upgrade to the latest version or the version mentioned above
+
+
+**Temporary Solution (upgrade asap):**
+
+Modify the Nginx config file and disable the vulnerable api listed below
+
+```
+/api/v1/authentication/connection-token/
+/api/v1/users/connection-token/
+```
+
+Path to Nginx config file
+
+```
+# Previous Community version
+/etc/nginx/conf.d/jumpserver.conf
+
+# Previous Enterprise version
+jumpserver-release/nginx/http_server.conf
+ 
+# Latest version
+jumpserver-release/compose/config_static/http_server.conf
+```
+
+Changes in Nginx config file
+
+```
+### Put the following code on top of location server, or before /api and /
+location /api/v1/authentication/connection-token/ {
+   return 403;
+}
+ 
+location /api/v1/users/connection-token/ {
+   return 403;
+}
+### End right here
+ 
+location /api/ {
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_pass http://core:8080;
+  }
+ 
+...
+```
+
+Save the file and restart Nginx
+
+```
+docker deployment: 
+$ docker restart jms_nginx
+
+rpm or other deployment:
+$ systemctl restart nginx
+
+```
+
+**Bug Fix Verification**
+
+```
+# Download the following script to check if it is fixed
+$ wget https://github.com/jumpserver/jumpserver/releases/download/v2.6.2/jms_bug_check.sh 
+
+# Run the code to verify it
+$ bash jms_bug_check.sh demo.jumpserver.org
+漏洞已修复 (It means the bug is fixed)
+漏洞未修复 (It means the bug is not fixed and the system is still vulnerable)
+```
+
+
+**Attack Simulation**
+
+Go to the logs directory which should contain gunicorn.log file. Then download the "attack" script and execute it
+
+```
+$ pwd
+/opt/jumpserver/core/logs
+
+$ ls gunicorn.log
+gunicorn.log
+
+$ wget 'https://github.com/jumpserver/jumpserver/releases/download/v2.6.2/jms_check_attack.sh'
+$ bash jms_check_attack.sh
+系统未被入侵 (It means the system is safe)
+系统已被入侵 (It means the system is being attacked)
+```
+
+--------------------------
 
 ----
 
-- [中文版](https://github.com/jumpserver/jumpserver/blob/master/README_EN.md)
+- [中文版](https://github.com/jumpserver/jumpserver/blob/master/README.md)
 
-Jumpserver is the first fully open source bastion in the world, based on the GNU GPL v2.0 open source protocol. Jumpserver is a  professional operation and maintenance audit system conforms to 4A specifications.
+Jumpserver is the world's first open-source PAM (Privileged Access Management System) and is licensed under the GNU GPL v2.0. It is a 4A-compliant professional operation and maintenance security audit system.
 
-Jumpserver is developed using Python / Django, conforms to the Web 2.0 specification, and is equipped with the industry-leading Web Terminal solution which have beautiful interface and great user experience.
+Jumpserver uses Python / Django for development, follows Web 2.0 specifications, and is equipped with an industry-leading Web Terminal solution that provides a beautiful user interface and great user experience
 
-Jumpserver adopts a distributed architecture to support multi-branch deployment across multiple areas. The central node provides APIs, and login nodes are deployed in each branch. It can be scaled horizontally without concurrency restrictions.
+Jumpserver adopts a distributed architecture to support multi-branch deployment across multiple cross-regional areas. The central node provides APIs, and login nodes are deployed in each branch. It can be scaled horizontally without concurrency restrictions.
 
 Change the world, starting from little things.
 
@@ -47,7 +160,7 @@ We provide online demo, demo video and screenshots to get you started quickly.
 We provide the SDK for your other systems to quickly interact with the Jumpserver API.
 
 - [Python](https://github.com/jumpserver/jumpserver-python-sdk) Jumpserver other components use this SDK to complete the interaction.
-- [Java](https://github.com/KaiJunYan/jumpserver-java-sdk.git) 恺珺同学提供的Java版本的SDK thanks to 恺珺 for provide Java SDK
+- [Java](https://github.com/KaiJunYan/jumpserver-java-sdk.git) Thanks to 恺珺 for providing his Java SDK vesrion.
 
 
 ### License & Copyright

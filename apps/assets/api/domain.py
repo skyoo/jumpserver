@@ -1,7 +1,9 @@
 # ~*~ coding: utf-8 ~*~
 
-from rest_framework.views import APIView, Response
 from django.views.generic.detail import SingleObjectMixin
+from django.utils.translation import ugettext as _
+from rest_framework.views import APIView, Response
+from rest_framework.serializers import ValidationError
 
 from common.utils import get_logger
 from common.permissions import IsOrgAdmin, IsOrgAdminOrAppUser
@@ -16,8 +18,8 @@ __all__ = ['DomainViewSet', 'GatewayViewSet', "GatewayTestConnectionApi"]
 
 class DomainViewSet(OrgBulkModelViewSet):
     model = Domain
-    filter_fields = ("name", )
-    search_fields = filter_fields
+    filterset_fields = ("name", )
+    search_fields = filterset_fields
     permission_classes = (IsOrgAdminOrAppUser,)
     serializer_class = serializers.DomainSerializer
 
@@ -29,7 +31,7 @@ class DomainViewSet(OrgBulkModelViewSet):
 
 class GatewayViewSet(OrgBulkModelViewSet):
     model = Gateway
-    filter_fields = ("domain__name", "name", "username", "ip", "domain")
+    filterset_fields = ("domain__name", "name", "username", "ip", "domain")
     search_fields = ("domain__name", "name", "username", "ip")
     permission_classes = (IsOrgAdmin,)
     serializer_class = serializers.GatewaySerializer
@@ -42,6 +44,10 @@ class GatewayTestConnectionApi(SingleObjectMixin, APIView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object(Gateway.objects.all())
         local_port = self.request.data.get('port') or self.object.port
+        try:
+            local_port = int(local_port)
+        except ValueError:
+            raise ValidationError({'port': _('Number required')})
         ok, e = self.object.test_connective(local_port=local_port)
         if ok:
             return Response("ok")

@@ -5,13 +5,15 @@ from datetime import timedelta
 from django.db import transaction
 from django.db.models import Q
 from django.db.transaction import atomic
+from django.conf import settings
 from celery import shared_task
 from common.utils import get_logger
 from common.utils.timezone import now, dt_formater, dt_parser
 from users.models import User
+from ops.celery.decorator import register_as_period_task
 from assets.models import Node
 from perms.models import RebuildUserTreeTask, AssetPermission
-from perms.utils.user_asset_permission import rebuild_user_mapping_nodes_if_need_with_lock, lock
+from perms.utils.asset.user_permission import rebuild_user_mapping_nodes_if_need_with_lock, lock
 
 logger = get_logger(__file__)
 
@@ -33,7 +35,8 @@ def dispatch_mapping_node_tasks():
         rebuild_user_mapping_nodes_celery_task.delay(id)
 
 
-@shared_task(queue='check_asset_perm_expired')
+@register_as_period_task(interval=settings.PERM_EXPIRED_CHECK_PERIODIC)
+@shared_task(queue='celery_check_asset_perm_expired')
 @atomic()
 def check_asset_permission_expired():
     """
@@ -65,10 +68,10 @@ def check_asset_permission_expired():
 
 
 @shared_task(queue='node_tree')
-def dispatch_process_expired_asset_permission(asset_perm_ids):
+def dispatch_process_expired_asset_permission(asset_perms_id):
     user_ids = User.objects.filter(
-        Q(assetpermissions__id__in=asset_perm_ids) |
-        Q(groups__assetpermissions__id__in=asset_perm_ids)
+        Q(assetpermissions__id__in=asset_perms_id) |
+        Q(groups__assetpermissions__id__in=asset_perms_id)
     ).distinct().values_list('id', flat=True)
     RebuildUserTreeTask.objects.bulk_create(
         [RebuildUserTreeTask(user_id=user_id) for user_id in user_ids]
@@ -95,13 +98,13 @@ def create_rebuild_user_tree_task_by_related_nodes_or_assets(node_ids, asset_ids
         Node.objects.filter(key__in=node_keys).values_list('id', flat=True)
     )
 
-    asset_perm_ids = set()
-    asset_perm_ids.update(
+    asset_perms_id = set()
+    asset_perms_id.update(
         AssetPermission.objects.filter(
             assets__id__in=asset_ids
         ).values_list('id', flat=True).distinct()
     )
-    asset_perm_ids.update(
+    asset_perms_id.update(
         AssetPermission.objects.filter(
             nodes__id__in=node_ids
         ).values_list('id', flat=True).distinct()
@@ -110,12 +113,12 @@ def create_rebuild_user_tree_task_by_related_nodes_or_assets(node_ids, asset_ids
     user_ids = set()
     user_ids.update(
         User.objects.filter(
-            assetpermissions__id__in=asset_perm_ids
+            assetpermissions__id__in=asset_perms_id
         ).distinct().values_list('id', flat=True)
     )
     user_ids.update(
         User.objects.filter(
-            groups__assetpermissions__id__in=asset_perm_ids
+            groups__assetpermissions__id__in=asset_perms_id
         ).distinct().values_list('id', flat=True)
     )
 

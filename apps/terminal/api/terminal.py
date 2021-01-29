@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-from collections import OrderedDict
 import logging
 import uuid
 
@@ -8,7 +7,6 @@ from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.views import APIView, Response
-from rest_framework.permissions import AllowAny
 
 from common.drf.api import JMSBulkModelViewSet
 from common.utils import get_object_or_none
@@ -18,7 +16,7 @@ from .. import serializers
 from .. import exceptions
 
 __all__ = [
-    'TerminalViewSet', 'TerminalTokenApi', 'StatusViewSet', 'TerminalConfig',
+    'TerminalViewSet',  'StatusViewSet', 'TerminalConfig',
 ]
 logger = logging.getLogger(__file__)
 
@@ -27,7 +25,7 @@ class TerminalViewSet(JMSBulkModelViewSet):
     queryset = Terminal.objects.filter(is_deleted=False)
     serializer_class = serializers.TerminalSerializer
     permission_classes = (IsSuperUser,)
-    filter_fields = ['name', 'remote_addr']
+    filterset_fields = ['name', 'remote_addr', 'type']
 
     def create(self, request, *args, **kwargs):
         if isinstance(request.data, list):
@@ -60,40 +58,14 @@ class TerminalViewSet(JMSBulkModelViewSet):
             logger.error("Register terminal error: {}".format(data))
             return Response(data, status=400)
 
-    def get_permissions(self):
-        if self.action == "create":
-            self.permission_classes = (AllowAny,)
-        return super().get_permissions()
-
-
-class TerminalTokenApi(APIView):
-    permission_classes = (AllowAny,)
-    queryset = Terminal.objects.filter(is_deleted=False)
-
-    def get(self, request, *args, **kwargs):
-        try:
-            terminal = self.queryset.get(id=kwargs.get('terminal'))
-        except Terminal.DoesNotExist:
-            terminal = None
-
-        token = request.query_params.get("token")
-
-        if terminal is None:
-            return Response('May be reject by administrator', status=401)
-
-        if token is None or cache.get(token, "") != str(terminal.id):
-            return Response('Token is not valid', status=401)
-
-        if not terminal.is_accepted:
-            return Response("Terminal was not accepted yet", status=400)
-
-        if not terminal.user or not terminal.user.access_key:
-            return Response("No access key generate", status=401)
-
-        access_key = terminal.user.access_key()
-        data = OrderedDict()
-        data['access_key'] = {'id': access_key.id, 'secret': access_key.secret}
-        return Response(data, status=200)
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        status = self.request.query_params.get('status')
+        if not status:
+            return queryset
+        filtered_queryset_id = [str(q.id) for q in queryset if q.status == status]
+        queryset = queryset.filter(id__in=filtered_queryset_id)
+        return queryset
 
 
 class StatusViewSet(viewsets.ModelViewSet):
@@ -104,14 +76,10 @@ class StatusViewSet(viewsets.ModelViewSet):
     task_serializer_class = serializers.TaskSerializer
 
     def create(self, request, *args, **kwargs):
-        self.handle_status(request)
         self.handle_sessions()
         tasks = self.request.user.terminal.task_set.filter(is_finished=False)
         serializer = self.task_serializer_class(tasks, many=True)
         return Response(serializer.data, status=201)
-
-    def handle_status(self, request):
-        request.user.terminal.is_alive = True
 
     def handle_sessions(self):
         sessions_id = self.request.data.get('sessions', [])
@@ -143,7 +111,5 @@ class TerminalConfig(APIView):
     permission_classes = (IsAppUser,)
 
     def get(self, request):
-        user = request.user
-        terminal = user.terminal
-        configs = terminal.config
-        return Response(configs, status=200)
+        config = request.user.terminal.config
+        return Response(config, status=200)

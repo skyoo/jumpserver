@@ -27,12 +27,14 @@ urlpatterns = [
          api.SessionReplayViewSet.as_view({'get': 'retrieve', 'post': 'create'}),
          name='session-replay'),
     path('tasks/kill-session/', api.KillSessionAPI.as_view(), name='kill-session'),
-    path('terminals/<uuid:terminal>/access-key/', api.TerminalTokenApi.as_view(),
-         name='terminal-access-key'),
     path('terminals/config/', api.TerminalConfig.as_view(), name='terminal-config'),
     path('commands/export/', api.CommandExportApi.as_view(), name="command-export"),
+    path('commands/insecure-command/', api.InsecureCommandAlertAPI.as_view(), name="command-alert"),
     path('replay-storages/<uuid:pk>/test-connective/', api.ReplayStorageTestConnectiveApi.as_view(), name='replay-storage-test-connective'),
-    path('command-storages/<uuid:pk>/test-connective/', api.CommandStorageTestConnectiveApi.as_view(), name='command-storage-test-connective')
+    path('command-storages/<uuid:pk>/test-connective/', api.CommandStorageTestConnectiveApi.as_view(), name='command-storage-test-connective'),
+    # components
+    path('components/metrics/', api.ComponentsMetricsAPIView.as_view(), name='components-metrics'),
+    path('components/state/', api.ComponentsStateAPIView.as_view(), name='components-state'),
     # v2: get session's replay
     # path('v2/sessions/<uuid:pk>/replay/',
     #     api.SessionReplayV2ViewSet.as_view({'get': 'retrieve'}),

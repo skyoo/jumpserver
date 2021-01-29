@@ -13,7 +13,7 @@ from django.db.transaction import atomic
 from common.utils import get_logger
 from common.utils.common import lazyproperty
 from orgs.mixins.models import OrgModelMixin, OrgManager
-from orgs.utils import get_current_org, tmp_to_org, current_org
+from orgs.utils import get_current_org, tmp_to_org
 from orgs.models import Organization
 
 
@@ -38,6 +38,7 @@ class FamilyMixin:
     __children = None
     __all_children = None
     is_node = True
+    child_mark: int
 
     @staticmethod
     def clean_children_keys(nodes_keys):
@@ -103,7 +104,7 @@ class FamilyMixin:
             if value is None:
                 value = child_key
             child = self.__class__.objects.create(
-                id=_id, key=child_key, value=value, parent_key=self.key,
+                id=_id, key=child_key, value=value
             )
             return child
 
@@ -121,11 +122,22 @@ class FamilyMixin:
             created = True
         return child, created
 
+    def get_valid_child_mark(self):
+        key = "{}:{}".format(self.key, self.child_mark)
+        if not self.__class__.objects.filter(key=key).exists():
+            return self.child_mark
+        children_keys = self.get_children().values_list('key', flat=True)
+        children_keys_last = [key.split(':')[-1] for key in children_keys]
+        children_keys_last = [int(k) for k in children_keys_last if k.strip().isdigit()]
+        max_key_last = max(children_keys_last) if children_keys_last else 1
+        return max_key_last + 1
+
     def get_next_child_key(self):
-        mark = self.child_mark
-        self.child_mark += 1
+        child_mark = self.get_valid_child_mark()
+        key = "{}:{}".format(self.key, child_mark)
+        self.child_mark = child_mark + 1
         self.save()
-        return "{}:{}".format(self.key, mark)
+        return key
 
     def get_next_child_preset_name(self):
         name = ugettext("New node")
@@ -204,6 +216,30 @@ class FamilyMixin:
         if not with_self:
             sibling = sibling.exclude(key=self.key)
         return sibling
+
+    @classmethod
+    def create_node_by_full_value(cls, full_value):
+        if not full_value:
+            return []
+        nodes_family = full_value.split('/')
+        nodes_family = [v for v in nodes_family if v]
+        org_root = cls.org_root()
+        if nodes_family[0] == org_root.value:
+            nodes_family = nodes_family[1:]
+        return cls.create_nodes_recurse(nodes_family, org_root)
+
+    @classmethod
+    def create_nodes_recurse(cls, values, parent=None):
+        values = [v for v in values if v]
+        if not values:
+            return None
+        if parent is None:
+            parent = cls.org_root()
+        value = values[0]
+        child, created = parent.get_or_create_child(value=value)
+        if len(values) == 1:
+            return child
+        return cls.create_nodes_recurse(values[1:], child)
 
     def get_family(self):
         ancestors = self.get_ancestors()
@@ -328,7 +364,10 @@ class SomeNodesMixin:
 
     @classmethod
     def org_root(cls):
-        root = cls.objects.filter(parent_key='').exclude(key__startswith='-')
+        root = cls.objects.filter(parent_key='')\
+            .filter(key__regex=r'^[0-9]+$')\
+            .exclude(key__startswith='-')\
+            .order_by('key')
         if root:
             return root[0]
         else:
@@ -372,6 +411,7 @@ class Node(OrgModelMixin, SomeNodesMixin, FamilyMixin, NodeAssetsMixin):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     key = models.CharField(unique=True, max_length=64, verbose_name=_("Key"))  # '1:1:1:1'
     value = models.CharField(max_length=128, verbose_name=_("Value"))
+    full_value = models.CharField(max_length=4096, verbose_name=_('Full value'), default='')
     child_mark = models.IntegerField(default=0)
     date_create = models.DateTimeField(auto_now_add=True)
     parent_key = models.CharField(max_length=64, verbose_name=_("Parent key"),
@@ -384,10 +424,10 @@ class Node(OrgModelMixin, SomeNodesMixin, FamilyMixin, NodeAssetsMixin):
 
     class Meta:
         verbose_name = _("Node")
-        ordering = ['key']
+        ordering = ['parent_key', 'value']
 
     def __str__(self):
-        return self.value
+        return self.full_value
 
     # def __eq__(self, other):
     #     if not other:
@@ -411,15 +451,14 @@ class Node(OrgModelMixin, SomeNodesMixin, FamilyMixin, NodeAssetsMixin):
     def name(self):
         return self.value
 
-    @lazyproperty
-    def full_value(self):
+    def computed_full_value(self):
         # 不要在列表中调用该属性
         values = self.__class__.objects.filter(
             key__in=self.get_ancestor_keys()
         ).values_list('key', 'value')
         values = [v for k, v in sorted(values, key=lambda x: len(x[0]))]
-        values.append(self.value)
-        return ' / '.join(values)
+        values.append(str(self.value))
+        return '/' + '/'.join(values)
 
     @property
     def level(self):
@@ -458,3 +497,27 @@ class Node(OrgModelMixin, SomeNodesMixin, FamilyMixin, NodeAssetsMixin):
         if self.has_children_or_has_assets():
             return
         return super().delete(using=using, keep_parents=keep_parents)
+
+    def update_child_full_value(self):
+        nodes = self.get_all_children(with_self=True)
+        sort_key_func = lambda n: [int(i) for i in n.key.split(':')]
+        nodes_sorted = sorted(list(nodes), key=sort_key_func)
+        nodes_mapper = {n.key: n for n in nodes_sorted}
+        if not self.is_org_root():
+            # 如果是org_root，那么parent_key为'', parent为自己，所以这种情况不处理
+            # 更新自己时，自己的parent_key获取不到
+            nodes_mapper.update({self.parent_key: self.parent})
+        for node in nodes_sorted:
+            parent = nodes_mapper.get(node.parent_key)
+            if not parent:
+                if node.parent_key:
+                    logger.error(f'Node parent node in mapper: {node.parent_key} {node.value}')
+                continue
+            node.full_value = parent.full_value + '/' + node.value
+        self.__class__.objects.bulk_update(nodes, ['full_value'])
+
+    def save(self, *args, **kwargs):
+        self.full_value = self.computed_full_value()
+        instance = super().save(*args, **kwargs)
+        self.update_child_full_value()
+        return instance

@@ -5,8 +5,9 @@ from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, generics
 from rest_framework.views import Response
 
+from common.drf.api import JMSBulkModelViewSet
 from common.permissions import IsOrgAdmin
-from common.serializers import CeleryTaskSerializer
+from common.drf.serializers import CeleryTaskSerializer
 from ..models import Task, AdHoc, AdHocExecution
 from ..serializers import (
     TaskSerializer,
@@ -22,10 +23,10 @@ __all__ = [
 ]
 
 
-class TaskViewSet(viewsets.ModelViewSet):
+class TaskViewSet(JMSBulkModelViewSet):
     queryset = Task.objects.all()
-    filter_fields = ("name",)
-    search_fields = filter_fields
+    filterset_fields = ("name",)
+    search_fields = filterset_fields
     serializer_class = TaskSerializer
     permission_classes = (IsOrgAdmin,)
 

@@ -7,7 +7,7 @@ from django.db.models import signals
 from django.db.models import Q
 from django.utils.translation import ugettext_lazy as _
 
-from common.utils import is_uuid
+from common.utils import is_uuid, lazyproperty
 from common.const import choices
 from common.db.models import ChoiceSet
 
@@ -23,7 +23,7 @@ class Organization(models.Model):
     name = models.CharField(max_length=128, unique=True, verbose_name=_("Name"))
     created_by = models.CharField(max_length=32, null=True, blank=True, verbose_name=_('Created by'))
     date_created = models.DateTimeField(auto_now_add=True, null=True, blank=True, verbose_name=_('Date created'))
-    comment = models.TextField(max_length=128, default='', blank=True, verbose_name=_('Comment'))
+    comment = models.TextField(default='', blank=True, verbose_name=_('Comment'))
     members = models.ManyToManyField('users.User', related_name='orgs', through='orgs.OrganizationMember',
                                      through_fields=('org', 'user'))
 
@@ -214,6 +214,33 @@ class Organization(models.Model):
     def change_to(self):
         from .utils import set_current_org
         set_current_org(self)
+
+    @lazyproperty
+    def resource_statistics_cache(self):
+        from .caches import OrgResourceStatisticsCache
+        return OrgResourceStatisticsCache(self)
+
+    def get_total_resources_amount(self):
+        from django.apps import apps
+        from orgs.mixins.models import OrgModelMixin
+        summary = {'users.Members': self.members.all().count()}
+        for app_name, app_config in apps.app_configs.items():
+            models_cls = app_config.get_models()
+            for model in models_cls:
+                if not issubclass(model, OrgModelMixin):
+                    continue
+                key = '{}.{}'.format(app_name, model.__name__)
+                summary[key] = self.get_resource_amount(model)
+        return summary
+
+    def get_resource_amount(self, resource_model):
+        from .utils import tmp_to_org
+        from .mixins.models import OrgModelMixin
+
+        if not issubclass(resource_model, OrgModelMixin):
+            return 0
+        with tmp_to_org(self):
+            return resource_model.objects.all().count()
 
 
 def _convert_to_uuid_set(users):

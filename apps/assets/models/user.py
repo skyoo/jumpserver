@@ -72,6 +72,9 @@ class SystemUser(BaseUser):
     PROTOCOL_TELNET = 'telnet'
     PROTOCOL_VNC = 'vnc'
     PROTOCOL_MYSQL = 'mysql'
+    PROTOCOL_ORACLE = 'oracle'
+    PROTOCOL_MARIADB = 'mariadb'
+    PROTOCOL_POSTGRESQL = 'postgresql'
     PROTOCOL_K8S = 'k8s'
     PROTOCOL_CHOICES = (
         (PROTOCOL_SSH, 'ssh'),
@@ -79,8 +82,28 @@ class SystemUser(BaseUser):
         (PROTOCOL_TELNET, 'telnet'),
         (PROTOCOL_VNC, 'vnc'),
         (PROTOCOL_MYSQL, 'mysql'),
+        (PROTOCOL_ORACLE, 'oracle'),
+        (PROTOCOL_MARIADB, 'mariadb'),
+        (PROTOCOL_POSTGRESQL, 'postgresql'),
         (PROTOCOL_K8S, 'k8s'),
     )
+    ASSET_CATEGORY_PROTOCOLS = [
+        PROTOCOL_SSH, PROTOCOL_RDP, PROTOCOL_TELNET, PROTOCOL_VNC
+    ]
+    APPLICATION_CATEGORY_REMOTE_APP_PROTOCOLS = [
+        PROTOCOL_RDP
+    ]
+    APPLICATION_CATEGORY_DB_PROTOCOLS = [
+        PROTOCOL_MYSQL, PROTOCOL_ORACLE, PROTOCOL_MARIADB, PROTOCOL_POSTGRESQL
+    ]
+    APPLICATION_CATEGORY_CLOUD_PROTOCOLS = [
+        PROTOCOL_K8S
+    ]
+    APPLICATION_CATEGORY_PROTOCOLS = [
+        *APPLICATION_CATEGORY_REMOTE_APP_PROTOCOLS,
+        *APPLICATION_CATEGORY_DB_PROTOCOLS,
+        *APPLICATION_CATEGORY_CLOUD_PROTOCOLS
+    ]
 
     LOGIN_AUTO = 'auto'
     LOGIN_MANUAL = 'manual'
@@ -104,6 +127,7 @@ class SystemUser(BaseUser):
     token = models.TextField(default='', verbose_name=_('Token'))
     home = models.CharField(max_length=4096, default='', verbose_name=_('Home'), blank=True)
     system_groups = models.CharField(default='', max_length=4096, verbose_name=_('System groups'), blank=True)
+    ad_domain = models.CharField(default='', max_length=256)
     _prefer = 'system_user'
 
     def __str__(self):
@@ -138,11 +162,16 @@ class SystemUser(BaseUser):
 
     @property
     def is_need_test_asset_connective(self):
-        return self.protocol not in [self.PROTOCOL_MYSQL]
+        return self.protocol in self.ASSET_CATEGORY_PROTOCOLS
+
+    def has_special_auth(self, asset=None, username=None):
+        if username is None and self.username_same_with_user:
+            raise TypeError('System user is dynamic, username should be pass')
+        return super().has_special_auth(asset=asset, username=username)
 
     @property
     def can_perm_to_asset(self):
-        return self.protocol not in [self.PROTOCOL_MYSQL]
+        return self.protocol in self.ASSET_CATEGORY_PROTOCOLS
 
     def _merge_auth(self, other):
         super()._merge_auth(other)
@@ -174,6 +203,17 @@ class SystemUser(BaseUser):
         assets_ids.update(nodes_assets_ids)
         assets = Asset.objects.filter(id__in=assets_ids)
         return assets
+
+    @classmethod
+    def get_protocol_by_application_type(cls, app_type):
+        from applications.const import ApplicationTypeChoices
+        if app_type in cls.APPLICATION_CATEGORY_PROTOCOLS:
+            protocol = app_type
+        elif app_type in ApplicationTypeChoices.remote_app_types():
+            protocol = cls.PROTOCOL_RDP
+        else:
+            protocol = None
+        return protocol
 
     class Meta:
         ordering = ['name']

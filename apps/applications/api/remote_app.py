@@ -1,27 +1,19 @@
 # coding: utf-8
 #
 
-from orgs.mixins.api import OrgBulkModelViewSet
 from orgs.mixins import generics
-from ..hands import IsOrgAdmin, IsAppUser
-from ..models import RemoteApp
-from ..serializers import RemoteAppSerializer, RemoteAppConnectionInfoSerializer
+from ..hands import IsAppUser
+from .. import models
+from ..serializers import RemoteAppConnectionInfoSerializer
+from ..permissions import IsRemoteApp
 
 
 __all__ = [
-    'RemoteAppViewSet', 'RemoteAppConnectionInfoApi',
+    'RemoteAppConnectionInfoApi',
 ]
 
 
-class RemoteAppViewSet(OrgBulkModelViewSet):
-    model = RemoteApp
-    filter_fields = ('name', 'type', 'comment')
-    search_fields = filter_fields
-    permission_classes = (IsOrgAdmin,)
-    serializer_class = RemoteAppSerializer
-
-
 class RemoteAppConnectionInfoApi(generics.RetrieveAPIView):
-    model = RemoteApp
-    permission_classes = (IsAppUser, )
+    model = models.Application
+    permission_classes = (IsAppUser, IsRemoteApp)
     serializer_class = RemoteAppConnectionInfoSerializer

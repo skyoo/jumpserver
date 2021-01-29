@@ -42,10 +42,10 @@ class UserSerializer(CommonBulkSerializerMixin, serializers.ModelSerializer):
         choices=PASSWORD_STRATEGY_CHOICES, required=False, initial=0,
         label=_('Password strategy'), write_only=True
     )
-    mfa_level_display = serializers.ReadOnlyField(source='get_mfa_level_display')
-    login_blocked = serializers.SerializerMethodField()
-    can_update = serializers.SerializerMethodField()
-    can_delete = serializers.SerializerMethodField()
+    mfa_level_display = serializers.ReadOnlyField(source='get_mfa_level_display', label=_('MFA level for display'))
+    login_blocked = serializers.SerializerMethodField(label=_('Login blocked'))
+    can_update = serializers.SerializerMethodField(label=_('Can update'))
+    can_delete = serializers.SerializerMethodField(label=_('Can delete'))
     org_roles = serializers.ListField(label=_('Organization role name'), allow_null=True, required=False,
                                       child=serializers.ChoiceField(choices=ORG_ROLE.choices))
     key_prefix_block = "_LOGIN_BLOCK_{}"
@@ -68,6 +68,10 @@ class UserSerializer(CommonBulkSerializerMixin, serializers.ModelSerializer):
             'can_update', 'can_delete', 'login_blocked', 'org_roles'
         ]
 
+        read_only_fields = [
+            'date_joined', 'last_login', 'created_by', 'is_first_login', 'source'
+        ]
+
         extra_kwargs = {
             'password': {'write_only': True, 'required': False, 'allow_null': True, 'allow_blank': True},
             'public_key': {'write_only': True},
@@ -76,13 +80,13 @@ class UserSerializer(CommonBulkSerializerMixin, serializers.ModelSerializer):
             'is_expired': {'label': _('Is expired')},
             'avatar_url': {'label': _('Avatar url')},
             'created_by': {'read_only': True, 'allow_blank': True},
-            'can_update': {'read_only': True},
-            'can_delete': {'read_only': True},
             'groups_display': {'label': _('Groups name')},
             'source_display': {'label': _('Source name')},
             'org_role_display': {'label': _('Organization role name')},
             'role_display': {'label': _('Super role name')},
-            'total_role_display': {'label': _('Total role name')}
+            'total_role_display': {'label': _('Total role name')},
+            'mfa_enabled': {'label': _('MFA enabled')},
+            'mfa_force_enabled': {'label': _('MFA force enabled')},
         }
 
     def __init__(self, *args, **kwargs):
@@ -232,6 +236,9 @@ class UserProfileSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + [
             'public_key_comment', 'public_key_hash_md5', 'admin_or_audit_orgs', 'current_org_roles',
             'guide_url', 'user_all_orgs'
+        ]
+        read_only_fields = [
+            'date_joined', 'last_login', 'created_by', 'source'
         ]
         extra_kwargs = dict(UserSerializer.Meta.extra_kwargs)
         extra_kwargs.update({

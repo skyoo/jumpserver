@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 class AssetUserFilterBackend(filters.BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
         kwargs = {}
-        for field in view.filter_fields:
+        for field in view.filterset_fields:
             value = request.GET.get(field)
             if not value:
                 continue
@@ -78,7 +78,7 @@ class AssetUserViewSet(CommonApiMixin, BulkModelViewSet):
         'retrieve': serializers.AssetUserReadSerializer,
     }
     permission_classes = [IsOrgAdminOrAppUser]
-    filter_fields = [
+    filterset_fields = [
         "id", "ip", "hostname", "username",
         "asset_id", "node_id",
         "prefer", "prefer_id",
@@ -131,7 +131,7 @@ class AssetUserTaskCreateAPI(generics.CreateAPIView):
     permission_classes = (IsOrgAdminOrAppUser,)
     serializer_class = serializers.AssetUserTaskSerializer
     filter_backends = AssetUserViewSet.filter_backends
-    filter_fields = AssetUserViewSet.filter_fields
+    filterset_fields = AssetUserViewSet.filterset_fields
 
     def get_asset_users(self):
         manager = AssetUserManager()

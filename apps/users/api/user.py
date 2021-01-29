@@ -6,8 +6,8 @@ from rest_framework.decorators import action
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework_bulk import BulkModelViewSet
+from django.db.models import Prefetch
 
-from common.db.aggregates import GroupConcat
 from common.permissions import (
     IsOrgAdmin, IsOrgAdminOrAppUser,
     CanUpdateDeleteUser, IsSuperUser
@@ -32,8 +32,8 @@ __all__ = [
 
 
 class UserViewSet(CommonApiMixin, UserQuerysetMixin, BulkModelViewSet):
-    filter_fields = ('username', 'email', 'name', 'id', 'source')
-    search_fields = filter_fields
+    filterset_fields = ('username', 'email', 'name', 'id', 'source')
+    search_fields = filterset_fields
     permission_classes = (IsOrgAdmin, CanUpdateDeleteUser)
     serializer_classes = {
         'default': UserSerializer,
@@ -44,9 +44,18 @@ class UserViewSet(CommonApiMixin, UserQuerysetMixin, BulkModelViewSet):
     extra_filter_backends = [OrgRoleUserFilterBackend]
 
     def get_queryset(self):
-        return super().get_queryset().annotate(
-            gc_m2m_org_members__role=GroupConcat('m2m_org_members__role'),
-        ).prefetch_related('groups')
+        queryset = super().get_queryset().prefetch_related(
+            'groups'
+        )
+        if current_org.is_real():
+            # 为在列表中计算用户在真实组织里的角色
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    'm2m_org_members',
+                    queryset=OrganizationMember.objects.filter(org__id=current_org.id)
+                )
+            )
+        return queryset
 
     def send_created_signal(self, users):
         if not isinstance(users, list):
@@ -55,11 +64,13 @@ class UserViewSet(CommonApiMixin, UserQuerysetMixin, BulkModelViewSet):
             post_user_create.send(self.__class__, user=user)
 
     @staticmethod
-    def set_users_to_org(users, org_roles):
+    def set_users_to_org(users, org_roles, update=False):
         # 只有真实存在的组织才真正关联用户
         if not current_org or not current_org.is_real():
             return
         for user, roles in zip(users, org_roles):
+            if update and roles is None:
+                continue
             if not roles:
                 # 当前组织创建的用户，至少是该组织的`User`
                 roles = [ORG_ROLE.USER]
@@ -107,7 +118,7 @@ class UserViewSet(CommonApiMixin, UserQuerysetMixin, BulkModelViewSet):
         users = serializer.save()
         if isinstance(users, User):
             users = [users]
-        self.set_users_to_org(users, org_roles)
+        self.set_users_to_org(users, org_roles, update=True)
 
     def perform_bulk_update(self, serializer):
         # TODO: 需要测试
